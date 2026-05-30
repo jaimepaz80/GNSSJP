@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GNSSJP - Motor de Procesamiento Diferencial</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        h1, h3 { color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+        .header-title { font-size: 1.5em; font-weight: bold; margin-bottom: 5px; }
+        .header-subtitle { font-size: 0.9em; color: #7f8c8d; margin-bottom: 20px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 0.9em; }
+        input[type="file"], input[type="number"], input[type="text"], select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #3498db; color: white; border: none; padding: 12px 20px; font-size: 1em; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; transition: background 0.3s; }
+        button:hover { background-color: #2980b9; }
+        button:disabled { background-color: #95a5a6; cursor: not-allowed; }
+        .console-box { background-color: #1e1e1e; color: #00ff00; font-family: monospace; padding: 15px; height: 300px; overflow-y: auto; border-radius: 4px; margin-top: 20px; white-space: pre-wrap; font-size: 0.9em; }
+        .btn-download { background-color: #27ae60; margin-top: 15px; display: none; text-align:center; text-decoration:none; padding:12px 20px; border-radius:4px; color:white; font-weight:bold; transition: background 0.3s;}
+        .btn-download:hover { background-color: #2ecc71; }
+        .section-box { border: 1px solid #e0e0e0; padding: 15px; border-radius: 5px; background-color: #fafafa; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header-title">Sistema de Cálculo Diferencial GNSSJP</div>
+    <div class="header-subtitle">Ing. Jaime Ulises Paz Lopez | Control Topográfico</div>
+
+    <form id="gnssForm">
+        <div class="section-box">
+            <h3>1. Archivos RINEX - Estación Base (JP3)</h3>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Archivo OBS (Base):</label>
+                    <input type="file" id="obs_base" name="obs_base" accept=".obs,*/*" required>
+                </div>
+                <div class="form-group">
+                    <label>Archivo NAV (Base):</label>
+                    <input type="file" id="nav_base" name="nav_base" accept=".nav,*/*" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Altura de Bastón / Antena Base (metros):</label>
+                <input type="number" step="0.001" id="altura_base" name="altura_base" value="0.000" required>
+            </div>
+        </div>
+
+        <div class="section-box">
+            <h3>2. Archivos RINEX - Rover (R1 / Punto a calcular)</h3>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Archivo OBS (Rover):</label>
+                    <input type="file" id="obs_rover" name="obs_rover" accept=".obs,*/*" required>
+                </div>
+                <div class="form-group">
+                    <label>Archivo NAV (Rover):</label>
+                    <input type="file" id="nav_rover" name="nav_rover" accept=".nav,*/*" required>
+                </div>
+            </div>
+            <div class="form-group">
+                <label>Altura de Bastón / Antena Rover (metros):</label>
+                <input type="number" step="0.001" id="altura_rover" name="altura_rover" value="2.000" required>
+            </div>
+        </div>
+
+        <div class="section-box">
+            <h3>3. Coordenadas Conocidas de la Base (UTM)</h3>
+            <div class="grid-2">
+                <div class="form-group">
+                    <label>Norte (m):</label>
+                    <input type="number" step="0.001" id="utm_norte" name="utm_norte" required>
+                </div>
+                <div class="form-group">
+                    <label>Este (m):</label>
+                    <input type="number" step="0.001" id="utm_este" name="utm_este" required>
+                </div>
+                <div class="form-group">
+                    <label>Cota Ortométrica (m):</label>
+                    <input type="number" step="0.001" id="utm_cota" name="utm_cota" required>
+                </div>
+                <div class="grid-2">
+                    <div class="form-group">
+                        <label>Huso:</label>
+                        <input type="number" id="utm_huso" name="utm_huso" value="19" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Hemisferio:</label>
+                        <select id="utm_hemisferio" name="utm_hemisferio">
+                            <option value="N">Norte (N)</option>
+                            <option value="S">Sur (S)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <button type="submit" id="btnProcesar">Ejecutar Procesamiento Matemático</button>
+    </form>
+
+    <div class="console-box" id="consoleOutput">> Esperando carga de datos e inicialización del motor nativo Python...</div>
+    
+    <a id="btnDescargar" class="btn-download">Descargar Informe Técnico</a>
+</div>
+
+<script>
+    document.getElementById('gnssForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btnProcesar = document.getElementById('btnProcesar');
+        const consoleOut = document.getElementById('consoleOutput');
+        const btnDescargar = document.getElementById('btnDescargar');
+        
+        btnProcesar.disabled = true;
+        btnDescargar.style.display = 'none';
+        consoleOut.innerHTML = "> Iniciando transferencia de archivos al núcleo de Termux...\n";
+
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('/procesar', { method: 'POST', body: formData });
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder("utf-8");
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const textChunk = decoder.decode(value, { stream: true });
+                consoleOut.innerHTML += textChunk;
+                consoleOut.scrollTop = consoleOut.scrollHeight;
+
+                if (textChunk.includes("INFORME_GENERADO:")) {
+                    const parts = textChunk.split("INFORME_GENERADO:");
+                    const fileName = parts[1].trim();
+                    btnDescargar.href = "/descargar/" + fileName;
+                    btnDescargar.style.display = 'block';
+                }
+            }
+        } catch (error) {
+            consoleOut.innerHTML += "\n[ERROR CRÍTICO]: Falla de conexión con el motor Python en Termux en el puerto 9000.\n";
+        } finally {
+            btnProcesar.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>
