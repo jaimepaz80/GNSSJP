@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GNSSJP - Motor de Procesamiento Diferencial</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#3498db">
+    
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f4f9; color: #333; margin: 0; padding: 20px; }
         .container { max-width: 900px; margin: 0 auto; background: #fff; padding: 25px; border-radius: 8px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
@@ -100,12 +103,19 @@
         <button type="submit" id="btnProcesar">Ejecutar Procesamiento Matemático</button>
     </form>
 
-    <div class="console-box" id="consoleOutput">> Esperando carga de datos e inicialización del motor nativo Python...</div>
+    <div class="console-box" id="consoleOutput">> Interfaz cargada. Esperando comunicación con el motor en Termux...</div>
     
-    <a id="btnDescargar" class="btn-download">Descargar Informe Técnico</a>
+    <a id="btnDescargar" class="btn-download" target="_blank">Descargar Informe Técnico</a>
 </div>
 
 <script>
+    // Registro del Service Worker para el modo Offline
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').then(reg => console.log('Modo Offline Activado')).catch(err => console.log('Fallo Offline', err));
+        });
+    }
+
     document.getElementById('gnssForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const btnProcesar = document.getElementById('btnProcesar');
@@ -114,12 +124,18 @@
         
         btnProcesar.disabled = true;
         btnDescargar.style.display = 'none';
-        consoleOut.innerHTML = "> Iniciando transferencia de archivos al núcleo de Termux...\n";
+        
+        // El secreto: Vercel apuntará al servidor local de Termux
+        const url_motor = 'http://127.0.0.1:9000';
+        consoleOut.innerHTML = `> Conectando con Termux en ${url_motor}...\n`;
 
         const formData = new FormData(e.target);
 
         try {
-            const response = await fetch('/procesar', { method: 'POST', body: formData });
+            const response = await fetch(`${url_motor}/procesar`, { method: 'POST', body: formData });
+            
+            if (!response.ok) throw new Error("Motor apagado");
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder("utf-8");
 
@@ -133,12 +149,13 @@
                 if (textChunk.includes("INFORME_GENERADO:")) {
                     const parts = textChunk.split("INFORME_GENERADO:");
                     const fileName = parts[1].trim();
-                    btnDescargar.href = "/descargar/" + fileName;
+                    // Descargar directamente desde Termux
+                    btnDescargar.href = `${url_motor}/descargar/${fileName}`;
                     btnDescargar.style.display = 'block';
                 }
             }
         } catch (error) {
-            consoleOut.innerHTML += "\n[ERROR CRÍTICO]: Falla de conexión con el motor Python en Termux en el puerto 9000.\n";
+            consoleOut.innerHTML += "\n[ERROR CRÍTICO]: No se encontró Termux. Asegúrate de tener abierta la aplicación Termux y corriendo el comando 'python app.py'.\n";
         } finally {
             btnProcesar.disabled = false;
         }
